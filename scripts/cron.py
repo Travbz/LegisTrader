@@ -8,7 +8,6 @@ import os
 
 class LegislatorsProcessor:
     def __init__(self, existing_members_url, db_params):
-    def __init__(self, existing_members_url):
         self.existing_members_url = existing_members_url
         self.db_params = self.load_secrets()
 
@@ -21,10 +20,10 @@ class LegislatorsProcessor:
             "port": os.getenv("DB_PORT")
         }
 
-        if all(value is not None for value in db_params.values()):
-            return db_params
-        else:
-            raise ValueError("Missing one or more database parameters in Kubernetes Secrets.")
+        if any(value is None for value in db_params.values()):
+            raise ValueError("One or more database parameters are missing in Kubernetes Secrets.")
+        return db_params
+
 
 
     def fetch_legislators_data(self):
@@ -114,12 +113,13 @@ if __name__ == "__main__":
     # Define the existing members URL and PostgreSQL connection parameters
     existing_members_url = "your_existing_members_url"
     db_params = {
-        "dbname": "officiallist",
-        "user": "travbz",
-        "password": "lol-lmao-69-420-24-7",
-        "host": "your_postgresql_service",
-        "port": "your_postgresql_port"
+        "dbname": os.getenv("DB_NAME"),
+        "user": os.getenv("DB_USER"),
+        "password": os.getenv("DB_PASSWORD"),
+        "host": os.getenv("DB_HOST"),
+        "port": os.getenv("DB_PORT")
     }
+
 
     # Instantiate the processor
     processor = LegislatorsProcessor(existing_members_url, db_params)
