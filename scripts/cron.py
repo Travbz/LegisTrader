@@ -111,7 +111,7 @@ class LegislatorsProcessor:
 
 if __name__ == "__main__":
     # Define the existing members URL and PostgreSQL connection parameters
-    existing_members_url = "your_existing_members_url"
+    existing_members_url = "https://theunitedstates.io/congress-legislators/legislators-current.json"
     db_params = {
         "dbname": os.getenv("DB_NAME"),
         "user": os.getenv("DB_USER"),
