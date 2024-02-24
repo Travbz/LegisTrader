@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: legislators-processor-service
+  namespace: official-list
+spec:
+  selector:
+    app: legislators-processor
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000  # Adjust the targetPort based on your application
+  type: ClusterIP
