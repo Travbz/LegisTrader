@@ -7,31 +7,27 @@ import psycopg2
 from psycopg2 import sql
 from datetime import datetime, timedelta
 import os
-import config
-
+# from kubernetes import client, config
 
 class LegislatorsProcessor:
     def __init__(self, existing_members_url, db_params):
         self.existing_members_url = existing_members_url
+        self.db_secret_name = db_secret_name
+        self.db_secret_namespace = db_secret_namespace
         self.db_params = self.load_secrets()
 
     def load_secrets(self):
-        config.load_incluster_config()  # Load in-cluster Kubernetes config
-        v1 = client.CoreV1Api()
-
-        # Fetch the secret from Kubernetes
-        secret = v1.read_namespaced_secret(self.db_secret_name, self.db_secret_namespace)
-
+        # Hardcoded secrets (replace these with your actual values)
         db_params = {
-            "dbname": secret.data["POSTGRES_DB"].decode('utf-8'),
-            "user": secret.data["POSTGRES_USER"].decode('utf-8'),
-            "password": secret.data["POSTGRES_PASSWORD"].decode('utf-8'),
-            "host": secret.data["POSTGRES_HOST"].decode('utf-8'),
-            "port": secret.data["POSTGRES_PORT"].decode('utf-8')
+            "dbname": "official",
+            "user": "admin",
+            "password": "admin",
+            "host": "10.100.117.64",
+            "port": "5432"
         }
 
         if any(value is None for value in db_params.values()):
-            raise ValueError("One or more database parameters are missing in Kubernetes Secrets.")
+            raise ValueError("One or more database parameters are missing.")
         return db_params
 
     def fetch_legislators_data(self):
@@ -129,6 +125,8 @@ class LegislatorsProcessor:
 if __name__ == "__main__":
     # Define the existing members URL
     existing_members_url = "https://theunitedstates.io/congress-legislators/legislators-current.json"
+    db_secret_name = 'postgres'
+    db_secret_namespace = 'official-list'
 
     # Instantiate the processor and load the database parameters
     processor = LegislatorsProcessor(existing_members_url, None)  # Pass None for db_params for now

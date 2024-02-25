@@ -24,10 +24,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Start cron service
 CMD ["cron", "-f"]
-
-
-
-
-# docker build -t officiallist:latest .
-# docker tag officiallist:1.1 travops87/officiallist:latest
-# docker push travops87/officiallist:latest 
