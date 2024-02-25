@@ -7,6 +7,6 @@ It writes to a stateful postgres instance in kubernetes and then check for a dif
 
 
 #### Background
-<p>I need to maintain a list of these members so I can check for recent stock trades made by legislators for copy trading. Basically I iterate through this list from another microservice that scrapes congresional stock trading disclosure data by conbgressional member and writes to a db that also looks for diffs between previously known disclousers and new data. If new data exists that indicates a trade has been placed.
+<p>I need to maintain a list of these members so I can check for recent stock trades made by legislators for copy trading. Basically I iterate through this list from another microservice that scrapes congresional stock trading disclosure data by cobgressional member and writes to a db that also looks for diffs between previously known disclousers and new data. If new data exists that indicates a trade has been placed.
 
 There is another service that notifies me when a new disclosure is detected so I can take action. Id like to build out a suite of services that scan legislation for keywords relating to ticker symbols to try and predict what legislation will pass based on congressional stock trade activity. If you want to contribute please let me know!</p>

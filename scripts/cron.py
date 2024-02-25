@@ -51,10 +51,12 @@ class LegislatorsProcessor:
             terms.sort(key=lambda x: x.get('end', ''), reverse=True)
             latest_term = terms[0]
 
+            firstname = regex.sub('', member['name']['first'])
+            lastname = regex.sub('', member['name']['last'])
+
             senate_dict = {
-                'fullname': regex.sub('', member['name'].get('official_full', f"{member['name']['first']} {member['name']['last']}")),
-                'firstname': regex.sub('', member['name']['first']),
-                'lastname': regex.sub('', member['name']['last']),
+                'firstname': firstname,
+                'lastname': lastname,
                 'id': member['id']['bioguide'],
                 'party': latest_term.get('party'),
                 'state': latest_term.get('state'),
@@ -63,9 +65,16 @@ class LegislatorsProcessor:
                 'end_term': latest_term.get('end')
             }
 
+            # Add logic to handle 'official_full' or concatenate 'firstname' and 'lastname'
+            if 'official_full' in member['name']:
+                senate_dict['fullname'] = regex.sub('', member['name']['official_full'])
+            else:
+                senate_dict['fullname'] = f"{firstname} {lastname}"
+
             senate_dicts.append(senate_dict)
 
         return pd.DataFrame(senate_dicts)
+
 
     def create_legislators_table(self, conn):
         with conn.cursor() as cursor:
@@ -118,10 +127,18 @@ class LegislatorsProcessor:
         conn.close()
 
 if __name__ == "__main__":
-    # Define the existing members URL and PostgreSQL connection parameters
+    # Define the existing members URL
     existing_members_url = "https://theunitedstates.io/congress-legislators/legislators-current.json"
-s    # Instantiate the processor
-    processor = LegislatorsProcessor(existing_members_url, db_params)
+
+    # Instantiate the processor and load the database parameters
+    processor = LegislatorsProcessor(existing_members_url, None)  # Pass None for db_params for now
+
+    # Load the database parameters from secrets
+    db_params = processor.load_secrets()
+
+    # Update the processor with the correct db_params
+    processor.db_params = db_params
 
     # Run the daily update
     processor.run_daily_update()
+
