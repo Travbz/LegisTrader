@@ -11,3 +11,23 @@ spec:
     port: 80
     targetPort: 5000  # Adjust the targetPort based on your application
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: official-list
+  labels:
+    app: postgres
+    role: service
+spec:
+  selector:
+    app: postgres
+    role: service
+  type: NodePort
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+
