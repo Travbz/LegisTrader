@@ -1,7 +1,7 @@
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: legislators-cronjob
+  name: pyJob
   namespace: official-list
 spec:
   schedule: "*/2 * * * *"  # Run every 2 minutes for testing
@@ -10,7 +10,7 @@ spec:
       template:
         spec:
           containers:
-          - name: legislators-processor
+          - name: pyJob
             image: travops87/officiallist:latest  # Replace with your Python image
             command: ["/bin/sh", "-c"]
             args:
