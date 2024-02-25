@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import re
 import pandas as pd
 import requests
@@ -5,6 +7,8 @@ import psycopg2
 from psycopg2 import sql
 from datetime import datetime, timedelta
 import os
+import config
+
 
 class LegislatorsProcessor:
     def __init__(self, existing_members_url, db_params):
@@ -12,19 +16,23 @@ class LegislatorsProcessor:
         self.db_params = self.load_secrets()
 
     def load_secrets(self):
+        config.load_incluster_config()  # Load in-cluster Kubernetes config
+        v1 = client.CoreV1Api()
+
+        # Fetch the secret from Kubernetes
+        secret = v1.read_namespaced_secret(self.db_secret_name, self.db_secret_namespace)
+
         db_params = {
-            "dbname": os.getenv("DB_NAME"),
-            "user": os.getenv("DB_USER"),
-            "password": os.getenv("DB_PASSWORD"),
-            "host": os.getenv("DB_HOST"),
-            "port": os.getenv("DB_PORT")
+            "dbname": secret.data["POSTGRES_DB"].decode('utf-8'),
+            "user": secret.data["POSTGRES_USER"].decode('utf-8'),
+            "password": secret.data["POSTGRES_PASSWORD"].decode('utf-8'),
+            "host": secret.data["POSTGRES_HOST"].decode('utf-8'),
+            "port": secret.data["POSTGRES_PORT"].decode('utf-8')
         }
 
         if any(value is None for value in db_params.values()):
             raise ValueError("One or more database parameters are missing in Kubernetes Secrets.")
         return db_params
-
-
 
     def fetch_legislators_data(self):
         existing_member_req = requests.get(self.existing_members_url)
@@ -112,16 +120,7 @@ class LegislatorsProcessor:
 if __name__ == "__main__":
     # Define the existing members URL and PostgreSQL connection parameters
     existing_members_url = "https://theunitedstates.io/congress-legislators/legislators-current.json"
-    db_params = {
-        "dbname": os.getenv("DB_NAME"),
-        "user": os.getenv("DB_USER"),
-        "password": os.getenv("DB_PASSWORD"),
-        "host": os.getenv("DB_HOST"),
-        "port": os.getenv("DB_PORT")
-    }
-
-
-    # Instantiate the processor
+s    # Instantiate the processor
     processor = LegislatorsProcessor(existing_members_url, db_params)
 
     # Run the daily update
