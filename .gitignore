@@ -8,3 +8,4 @@ Chart.lock
 *.tgz
 helper.txt
 hack.sh
+*.sh
