@@ -4,23 +4,18 @@ FROM python:3.8-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy only the necessary files
-COPY scripts/cron.py .
+# Copy the refactored cron.py script and requirements.txt
+COPY /scripts/cron.py .
 COPY requirements.txt .
 
-# Install dos2unix
-RUN apt-get update \
-    && apt-get -y install dos2unix
-
-# Convert line endings and ensure the script is executable
-RUN dos2unix cron.py \
-    && chmod +x cron.py
-
-# Install cron
-RUN apt-get -y install cron
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Start cron service
-CMD ["cron", "-f"]
+# Set the command to run the script
+CMD ["python", "cron.py"]

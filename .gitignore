@@ -3,3 +3,8 @@
 __pycache__
 .DS_Store
 */helper.txt
+Chart.lock
+.env
+*.tgz
+helper.txt
+hack.sh

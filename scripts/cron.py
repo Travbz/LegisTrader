@@ -5,35 +5,26 @@ import pandas as pd
 import requests
 import psycopg2
 from psycopg2 import sql
+from sqlalchemy import create_engine
+import logging
 from datetime import datetime, timedelta
 import os
-# from kubernetes import client, config
 
 class LegislatorsProcessor:
     def __init__(self, existing_members_url, db_params):
         self.existing_members_url = existing_members_url
-        self.db_secret_name = db_secret_name
-        self.db_secret_namespace = db_secret_namespace
-        self.db_params = self.load_secrets()
-
-    def load_secrets(self):
-        # Hardcoded secrets (replace these with your actual values)
-        db_params = {
-            "dbname": "official",
-            "user": "admin",
-            "password": "admin",
-            "host": "10.100.117.64",
-            "port": "5432"
-        }
-
-        if any(value is None for value in db_params.values()):
-            raise ValueError("One or more database parameters are missing.")
-        return db_params
+        self.db_params = db_params
+        self.logger = logging.getLogger(__name__)
 
     def fetch_legislators_data(self):
-        existing_member_req = requests.get(self.existing_members_url)
-        existing_members = existing_member_req.json()
-        return existing_members
+        try:
+            existing_member_req = requests.get(self.existing_members_url)
+            existing_member_req.raise_for_status()
+            existing_members = existing_member_req.json()
+            return existing_members
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Error fetching legislators data: {e}")
+            return []
 
     def process_legislators(self, data):
         regex = re.compile('[^a-zA-Z\s]')
@@ -61,7 +52,6 @@ class LegislatorsProcessor:
                 'end_term': latest_term.get('end')
             }
 
-            # Add logic to handle 'official_full' or concatenate 'firstname' and 'lastname'
             if 'official_full' in member['name']:
                 senate_dict['fullname'] = regex.sub('', member['name']['official_full'])
             else:
@@ -71,72 +61,100 @@ class LegislatorsProcessor:
 
         return pd.DataFrame(senate_dicts)
 
-
     def create_legislators_table(self, conn):
-        with conn.cursor() as cursor:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS legislators (
-                    fullname TEXT,
-                    firstname TEXT,
-                    lastname TEXT,
-                    id TEXT,
-                    party TEXT,
-                    state TEXT,
-                    position TEXT,
-                    start_term TEXT,
-                    end_term TEXT
-                )
-            ''')
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS legislators (
+                        fullname TEXT,
+                        firstname TEXT,
+                        lastname TEXT,
+                        id TEXT PRIMARY KEY,
+                        party TEXT,
+                        state TEXT,
+                        position TEXT,
+                        start_term TEXT,
+                        end_term TEXT
+                    )
+                ''')
+            conn.commit()
+            self.logger.info("Legislators table created successfully")
+        except psycopg2.Error as e:
+            self.logger.error(f"Error creating legislators table: {e}")
+            conn.rollback()
+            raise
 
-    def fetch_existing_legislators(self, conn):
-        query = "SELECT * FROM legislators"
-        existing_legislators = pd.read_sql_query(query, conn)
-        return existing_legislators
+    def fetch_existing_legislators(self, engine):
+        try:
+            query = "SELECT * FROM legislators"
+            existing_legislators = pd.read_sql_query(query, engine)
+            return existing_legislators
+        except pd.io.sql.DatabaseError as e:
+            self.logger.error(f"Error fetching existing legislators: {e}")
+            return pd.DataFrame()
 
     def update_database(self, conn, new_data):
-        existing_data = self.fetch_existing_legislators(conn)
-        new_rows = pd.concat([existing_data, new_data]).drop_duplicates(keep=False)
+        try:
+            existing_data = self.fetch_existing_legislators(conn)
+            merged_data = pd.concat([existing_data, new_data]).drop_duplicates(subset=['id'], keep='last')
 
-        if not new_rows.empty:
             with conn.cursor() as cursor:
-                insert_query = sql.SQL('INSERT INTO legislators VALUES {}').format(
-                    sql.SQL(',').join(map(sql.Literal, new_rows.to_records(index=False)))
-                )
-                cursor.execute(insert_query)
+                # Delete all existing rows
+                cursor.execute("DELETE FROM legislators")
+
+                # Insert the merged data
+                insert_query = """
+                    INSERT INTO legislators (fullname, firstname, lastname, id, party, state, position, start_term, end_term)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                data_tuples = [tuple(x) for x in merged_data.to_numpy()]
+                cursor.executemany(insert_query, data_tuples)
+
+            self.logger.info("Database updated successfully")
+        except (psycopg2.Error, pd.io.sql.DatabaseError) as e:
+            self.logger.error(f"Error updating database: {e}")
+            conn.rollback()
 
     def run_daily_update(self):
-        # PostgreSQL Database Connection
-        conn = psycopg2.connect(**self.db_params)
-        self.create_legislators_table(conn)
-
-        # Fetch existing legislators data from the database
-        existing_data = self.fetch_existing_legislators(conn)
-
-        # Fetch the latest data from the API
-        latest_data = self.process_legislators(self.fetch_legislators_data())
-
-        # Identify new rows and update the database
-        self.update_database(conn, latest_data)
-
-        # Commit changes and close the connection
-        conn.commit()
-        conn.close()
+        try:
+            conn = psycopg2.connect(**self.db_params)
+            
+            # Check if the "legislators" table exists
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables
+                        WHERE table_name = 'legislators'
+                    )
+                """)
+                table_exists = cursor.fetchone()[0]
+            
+            if not table_exists:
+                self.create_legislators_table(conn)
+            
+            latest_data = self.process_legislators(self.fetch_legislators_data())
+            self.update_database(conn, latest_data)
+            
+            conn.commit()
+            self.logger.info("Daily update completed successfully")
+        except psycopg2.Error as e:
+            self.logger.error(f"Error during daily update: {e}")
+            conn.rollback()
+        finally:
+            if conn:
+                conn.close()
 
 if __name__ == "__main__":
-    # Define the existing members URL
+    logging.basicConfig(level=logging.INFO)
+
     existing_members_url = "https://theunitedstates.io/congress-legislators/legislators-current.json"
-    db_secret_name = 'postgres'
-    db_secret_namespace = 'official-list'
+    db_params = {
+        "dbname": os.environ.get("POSTGRES_DB"),
+        "user": os.environ.get("POSTGRES_USER"),
+        "password": os.environ.get("POSTGRES_PASSWORD"),
+        "host": os.environ.get("POSTGRES_HOST"),
+        "port": os.environ.get("POSTGRES_PORT")
+    }
 
-    # Instantiate the processor and load the database parameters
-    processor = LegislatorsProcessor(existing_members_url, None)  # Pass None for db_params for now
-
-    # Load the database parameters from secrets
-    db_params = processor.load_secrets()
-
-    # Update the processor with the correct db_params
-    processor.db_params = db_params
-
-    # Run the daily update
+    processor = LegislatorsProcessor(existing_members_url, db_params)
     processor.run_daily_update()
-

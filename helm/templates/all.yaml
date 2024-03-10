@@ -1,0 +1,163 @@
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: {{ .Release.Name }}-cronjob-view
+# subjects:
+# - kind: ServiceAccount
+#   name: default
+#   namespace: {{ .Values.namespace.name }}
+# roleRef:
+#   kind: ClusterRole
+#   name: view
+#   apiGroup: rbac.authorization.k8s.io
+
+# ---
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: {{ .Release.Name }}-postgres-config
+#   namespace: {{ .Values.namespace.name }}
+# data:
+#   POSTGRES_HOST: "{{ .Release.Name }}-postgres"
+#   POSTGRES_PORT: "{{ .Values.postgres.service.port }}"
+# ---
+# apiVersion: batch/v1
+# kind: CronJob
+# metadata:
+#   name: {{ .Release.Name }}-pyjob
+#   namespace: {{ .Values.namespace.name }}
+# spec:
+#   schedule: "{{ .Values.cronjob.schedule }}"
+#   jobTemplate:
+#     spec:
+#       template:
+#         spec:
+#           containers:
+#           - name: pyjob
+#             image: {{ .Values.cronjob.image }}
+#             command:
+#               - "python"
+#             args:
+#               - "/app/cron.py"
+#             envFrom:
+#             - configMapRef:
+#                 name: {{ .Release.Name }}-postgres-config
+#             - secretRef:
+#                 name: {{ .Release.Name }}-postgres
+#           restartPolicy: OnFailure
+# ---
+# {{- if .Values.namespace.create }}
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: {{ .Values.namespace.name }}
+# {{- end }}
+# ---
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: {{ .Release.Name }}-postgres
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   capacity:
+#     storage: {{ .Values.postgres.storage.size }}
+#   hostPath:
+#     path: {{ .Values.postgres.storage.hostPath }}
+#   storageClassName: {{ .Values.postgres.storage.className }}
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: {{ .Release.Name }}-postgres
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: {{ .Values.postgres.storage.size }}
+#   volumeName: {{ .Release.Name }}-postgres
+# ---
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: {{ .Release.Name }}-postgres
+#   namespace: {{ .Values.namespace.name }}
+# type: Opaque
+# data:
+#   POSTGRES_DB: {{ .Values.postgres.database | b64enc }}
+#   POSTGRES_USER: {{ .Values.postgres.username | b64enc }}
+#   POSTGRES_PASSWORD: {{ .Values.postgres.password | b64enc }}
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: {{ .Release.Name }}-legislators-processor
+#   namespace: {{ .Values.namespace.name }}
+# spec:
+#   selector:
+#     app: legislators-processor
+#   ports:
+#   - protocol: TCP
+#     port: 80
+#     targetPort: 5000
+#   type: ClusterIP
+
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: {{ .Release.Name }}-postgres
+#   namespace: {{ .Values.namespace.name }}
+#   labels:
+#     app: postgres
+#     role: service
+# spec:
+#   selector:
+#     app: postgres
+#     role: service
+#   type: {{ .Values.postgres.service.type }}
+#   ports:
+#     - name: postgres
+#       port: {{ .Values.postgres.service.port }}
+#       targetPort: 5432
+#       protocol: TCP
+# ---
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: {{ .Release.Name }}-postgres
+#   namespace: {{ .Values.namespace.name }}
+#   labels:
+#     app: postgres
+#     role: service
+# spec:
+#   replicas: {{ .Values.postgres.replicas }}
+#   selector:
+#     matchLabels:
+#       app: postgres
+#       role: service
+#   serviceName: {{ .Release.Name }}-postgres
+#   template:
+#     metadata:
+#       labels:
+#         app: postgres
+#         role: service
+#     spec:
+#       containers:
+#         - name: postgres
+#           image: {{ .Values.postgres.image }}
+#           envFrom:
+#             - secretRef:
+#                 name: {{ .Release.Name }}-postgres
+#           ports:
+#             - containerPort: {{ .Values.postgres.port }}
+#               name: postgres
+#               protocol: TCP
+#           volumeMounts:
+#             - name: postgres
+#               mountPath: /var/lib/postgresql/data
+#       volumes:
+#         - name: postgres
+#           persistentVolumeClaim:
+#             claimName: {{ .Release.Name }}-postgres
