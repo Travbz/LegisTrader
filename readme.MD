@@ -1,12 +1,43 @@
 # Official List
 
-### Tool that will maintain a list of all US Senators and Representatives
+### Tool that Maintains a List of all US Senators and Representatives
 
-<p> Its a k8s 'microservice' that checks existing members of the house and senate daily and compares that to yesterdays list.
-It writes to a stateful postgres instance in kubernetes and then checks for a diff between its daily calls to the existing members endpoint and previously stored records in the statefulset. If a diff exists it will update the statefulset by adding the new members</p>
+The Official List is a Kubernetes microservice designed to keep an updated record of all US Senators and Representatives. It utilizes Kubernetes components, including a stateful PostgreSQL instance, to check for daily changes in the list of existing members in the House and Senate. Any new members detected are added to the statefulset, ensuring an accurate and up-to-date representation of the legislative body.
 
+## Functionality
 
-#### Background
-<p>I need to maintain a list of these members so I can check for recent stock trades made by legislators for copy trading. Basically I iterate through this list from another microservice that scrapes congresional stock trading disclosure data by congressional member, and writes to a db and then looks for diffs between previously known disclousers and new data. If new data exists, that indicates a trade has been placed and a payload will be sent to the notification service.
+The microservice performs the following tasks:
 
- The notification service lets me know when a new disclosure is detected so I can take action. Id like to build out a suite of services that scan legislation for keywords relating to ticker symbols to try and predict what legislation will pass based on congressional stock trade activity. If you want to contribute please let me know!</p>
+- **Daily Member Check:**
+  - Retrieves the current list of members from the House and Senate.
+  - Compares it with the list from the previous recording.
+  
+- **Database Management:**
+  - Writes the daily member list to a stateful PostgreSQL instance in Kubernetes.
+  - Updates the statefulset by adding new members if a diff exists.
+
+## Background
+
+The primary motivation behind maintaining this list is to facilitate the tracking of recent stock trades made by legislators. This information is crucial for copy trading, where another microservice iterates through the list and scrapes congressional stock trading disclosure data by member [Official Disclosure Service](https://github.com/Travbz/official-disclosures). The scraped data is stored in a database, and the microservice looks for differences between previously known disclosures and new data.
+
+If new data is detected, it signifies that a trade has been placed, triggering a payload to be sent to the notification service. The notification service alerts users about new disclosures, allowing them to take necessary actions.
+
+## Future Development
+
+We have plans to expand the functionality of the suite of services related to legislative activities. Future enhancements may include:
+
+- **Keyword-based Legislation Scanning:**
+  - Scanning legislation for keywords related to ticker symbols.
+  - Predicting potential legislative outcomes based on congressional stock trade activity.
+
+## Contribution
+
+If you are interested in contributing to the development of these services or have ideas for improvement, please let us know! Your collaboration is welcomed and appreciated.
+
+## Getting Started
+
+To deploy and use the Official List microservice, follow the instructions provided in the [Official List Deployment Guide](deployment-guide.md).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
