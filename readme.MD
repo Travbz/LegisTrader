@@ -34,10 +34,3 @@ We have plans to expand the functionality of the suite of services related to le
 
 If you are interested in contributing to the development of these services or have ideas for improvement, please let us know! Your collaboration is welcomed and appreciated.
 
-## Getting Started
-
-To deploy and use the Official List microservice, follow the instructions provided in the [Official List Deployment Guide](deployment-guide.md).
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
